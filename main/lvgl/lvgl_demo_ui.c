@@ -39,7 +39,7 @@ static void btn_loop_cb(lv_event_t * e)
     int is_loop = get_loop_play();
     if(is_loop) {
         set_loop_play(0);
-        lv_label_set_text_static(btn_loop_text, LV_SYMBOL_SD_CARD" ");
+        lv_label_set_text_static(btn_loop_text, "->");
     }
     else {
          set_loop_play(1);
@@ -100,7 +100,7 @@ void example_lvgl_demo_ui(lv_display_t *disp)
                     lv_obj_set_pos(obj, 1, 0);
                     lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
                     lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
-                    lv_label_set_text_static(obj, LV_SYMBOL_SD_CARD" ");
+                    lv_label_set_text_static(obj, "->");
                 }
             }
             lv_obj_add_event_cb(btn_loop, btn_loop_cb, LV_EVENT_CLICKED, disp);
@@ -112,7 +112,7 @@ void example_lvgl_demo_ui(lv_display_t *disp)
             slider_vol = obj;
             lv_obj_set_pos(obj, 20, 14);
             lv_obj_set_size(obj, 120, 16);
-            lv_slider_set_value(obj, 50, LV_ANIM_OFF);
+            lv_slider_set_value(obj, 50, LV_ANIM_ON);
             lv_obj_add_event_cb(obj, action_on_vol_value_changed, LV_EVENT_VALUE_CHANGED, (void *)0);
      }
    {
