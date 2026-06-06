@@ -133,7 +133,10 @@ static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_ser
                         break;
                     case AEL_STATE_PAUSED :
                         ESP_LOGI(TAG, "[ * ] Resuming audio pipeline");
-                        audio_pipeline_resume(pipeline);
+                        int source = get_play_source();
+                        if(source==0) {
+                              audio_pipeline_resume(pipeline);
+                        }
                         break;
                     default :
                         ESP_LOGI(TAG, "[ * ] Not supported state %d", el_state);
