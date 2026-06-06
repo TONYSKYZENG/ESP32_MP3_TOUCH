@@ -13,13 +13,15 @@
 #include "sdcard_scan.h"
 #include <string.h>
 #include <stdatomic.h>
-static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text;
+#include "play_embeded.h"
+static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text;
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_270;
 extern int player_volume;
 extern void set_player_vol(int vol);
 static _lock_t lvgl_window_lock;
 #define MAX_LIST_BUF_SIZE  (8192) // 根据最大歌曲数量预估内存（4KB 足够存约 100-200 首英文歌名）
 static char * song_string_buf = NULL;
+extern char * song_string_emb;
 extern void play_music_index(int idx);
 atomic_int g_is_loop_play = 0;
 int get_loop_play(void) {
@@ -45,6 +47,20 @@ static void btn_loop_cb(lv_event_t * e)
          set_loop_play(1);
         lv_label_set_text_static(btn_loop_text, LV_SYMBOL_LOOP" ");
     }
+}
+static void btn_source_cb(lv_event_t * e)
+{
+    int curr_status = get_play_source();
+    if(curr_status==0) {
+        lv_label_set_text_static(btn_source_text, "EMB");
+        set_play_source(1);
+        play_embeded_loop(mp3_data_start_train,mp3_data_end_train);
+    }
+    else {
+         lv_label_set_text_static(btn_source_text, "SD");
+        set_play_source(0);
+    }
+    
 }
 void action_on_vol_value_changed(lv_event_t * e){
     lv_obj_t * slider = lv_event_get_target(e);
@@ -90,7 +106,7 @@ void example_lvgl_demo_ui(lv_display_t *disp)
             // btn_loop
             lv_obj_t *obj = lv_button_create(scr);
             btn_loop = obj;
-            lv_obj_set_pos(obj, 110, 180);
+            lv_obj_set_pos(obj, 105, 180);
             lv_obj_set_size(obj, 71, 26);
             {
                 lv_obj_t *parent_obj = obj;
@@ -127,6 +143,25 @@ void example_lvgl_demo_ui(lv_display_t *disp)
             song_string_buf[0] = '\0'; // 初始化为空字符串
         }
     }
+    {
+            // btn_source
+            lv_obj_t *obj = lv_button_create(scr);
+            btn_source = obj;
+            lv_obj_set_pos(obj, 180, 180);
+            lv_obj_set_size(obj, 71, 26);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    btn_source_text = obj;
+                    lv_obj_set_pos(obj, 1, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "SD");
+                }
+            }
+            lv_obj_add_event_cb(btn_source, btn_source_cb, LV_EVENT_CLICKED, disp);
+    }
 }
 void sync_vol(int player_volume){
      _lock_acquire(&lvgl_window_lock);
@@ -146,7 +181,7 @@ void on_each_song_scanned(const char * filename) {
         strcat(song_string_buf, filename); // 拼接歌名
     }
 }
-void update_song_list(playlist_operator_handle_t handle){
+void update_song_list_sd(playlist_operator_handle_t handle){
     _lock_acquire(&lvgl_window_lock);
 
     int songs = sdcard_list_get_url_num(handle);
@@ -157,5 +192,10 @@ void update_song_list(playlist_operator_handle_t handle){
     }
     lv_roller_set_options(music_roller, song_string_buf, LV_ROLLER_MODE_NORMAL);
 
+    _lock_release(&lvgl_window_lock);
+}
+void update_song_list_emb(void){
+    _lock_acquire(&lvgl_window_lock);
+    lv_roller_set_options(music_roller, song_string_emb, LV_ROLLER_MODE_NORMAL);
     _lock_release(&lvgl_window_lock);
 }

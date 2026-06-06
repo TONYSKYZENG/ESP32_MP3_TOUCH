@@ -33,18 +33,18 @@
 #include "sdcard_list.h"
 #include "sdcard_scan.h"
 #include <stdatomic.h>
-
+#include "play_embeded.h"
 static const char *TAG = "SDCARD_MP3_CONTROL_EXAMPLE";
 
-audio_pipeline_handle_t pipeline;
+audio_pipeline_handle_t pipeline,pipeline_embeded;
 audio_element_handle_t i2s_stream_writer, mp3_decoder, fatfs_stream_reader, rsp_handle;
 playlist_operator_handle_t sdcard_list_handle = NULL;
 audio_board_handle_t g_board_handle= NULL;
 extern void app_main_lvgl_drv(void);
 extern void sync_vol(int vol);
-extern void update_song_list(playlist_operator_handle_t handle);
 extern int get_loop_play(void);
 atomic_int force_music_idx = 0;
+
 void set_player_vol(int vol){
     if (vol > 100) {
             vol = 100;
@@ -80,7 +80,14 @@ void play_music_index_isr(void) {
 void play_music_index(int idx) {
     atomic_store(&force_music_idx, idx);
     ESP_LOGW(TAG, "Force to play music: %d", idx);
-    play_music_index_isr();
+    int source = get_play_source();
+    if (source==0) {
+         play_music_index_isr();
+    }
+    else {
+        play_music_index_emb();
+    }
+   
 }
 static esp_err_t input_key_service_cb(periph_service_handle_t handle, periph_service_event_t *evt, void *ctx)
 {
@@ -251,7 +258,8 @@ void app_main(void)
     player_volume = 50;
     audio_hal_set_volume(g_board_handle->audio_hal, player_volume);
     sync_vol(player_volume);
-    update_song_list(sdcard_list_handle);
+    update_song_list_sd(sdcard_list_handle);
+    init_sound_embeded();
     play_music_index(-1);
     audio_pipeline_run(pipeline);
 

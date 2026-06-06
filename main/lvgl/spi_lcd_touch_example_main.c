@@ -19,6 +19,9 @@
 #include "esp_err.h"
 #include "esp_log.h"
 #include "lvgl.h"
+
+
+
 #define CONFIG_EXAMPLE_LCD_CONTROLLER_ILI9341 1
 #define CONFIG_EXAMPLE_LCD_TOUCH_CONTROLLER_XPT2046 1
 #define CONFIG_EXAMPLE_LCD_TOUCH_ENABLED 1
@@ -68,11 +71,11 @@ static const char *TAG = "example";
 #define EXAMPLE_LCD_PARAM_BITS         8
 
 #define EXAMPLE_LVGL_DRAW_BUF_LINES    20 // number of display lines in each draw buffer
-#define EXAMPLE_LVGL_TICK_PERIOD_MS    20
+#define EXAMPLE_LVGL_TICK_PERIOD_MS    5
 #define EXAMPLE_LVGL_TASK_MAX_DELAY_MS 5000
-#define EXAMPLE_LVGL_TASK_MIN_DELAY_MS 10
-#define EXAMPLE_LVGL_TASK_STACK_SIZE   (4 * 1024)
-#define EXAMPLE_LVGL_TASK_PRIORITY     0
+#define EXAMPLE_LVGL_TASK_MIN_DELAY_MS 5
+#define EXAMPLE_LVGL_TASK_STACK_SIZE   (6 * 1024)
+#define EXAMPLE_LVGL_TASK_PRIORITY     5
 
 // LVGL library is not thread-safe, this example will call LVGL APIs from different tasks, so use a mutex to protect it
 static _lock_t lvgl_api_lock;
@@ -298,7 +301,20 @@ void app_main_lvgl_drv(void)
 #endif
 
     ESP_LOGI(TAG, "Create LVGL task");
-    xTaskCreate(example_lvgl_port_task, "LVGL", EXAMPLE_LVGL_TASK_STACK_SIZE, NULL, EXAMPLE_LVGL_TASK_PRIORITY, NULL);
+    int current_core = xPortGetCoreID();
+    int lvgl_core =0;
+    if (current_core==0) {
+        lvgl_core = 1;
+    }
+    xTaskCreatePinnedToCore(
+        example_lvgl_port_task,    // 任务函数
+        "LVGL_Task",              // 任务名称
+        EXAMPLE_LVGL_TASK_STACK_SIZE,                     // 堆栈大小（LVGL 建议给大一点，比如 8K）
+        NULL,                     // 传递给任务的参数
+        EXAMPLE_LVGL_TASK_PRIORITY,                        // 任务优先级
+        NULL,                     // 任务句柄
+        lvgl_core                      // 📌 核心 ID：1 (APP_CPU)
+    );
 
     ESP_LOGI(TAG, "Display LVGL Meter Widget");
     // Lock the mutex due to the LVGL APIs are not thread-safe
