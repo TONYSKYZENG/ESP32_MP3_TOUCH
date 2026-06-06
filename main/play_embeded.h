@@ -28,9 +28,18 @@ void init_sound_embeded(void);
 void stop_sound_embeded(void);
 void set_play_source(int i);
 int get_play_source(void);
+
+void set_timer_max(int i);
+int get_timer_max(void);
+
+void set_timer_cur(int i);
+int get_timer_cur(void);
+
 void play_embeded_loop(uint8_t *start,uint8_t *end);
 void update_song_list_sd(playlist_operator_handle_t handle);
 void update_song_list_emb(void);
 void play_music_index_sd(void);
 void play_music_index_emb(void);
+void stop_music(void);
+void update_time_show(void);
 #endif

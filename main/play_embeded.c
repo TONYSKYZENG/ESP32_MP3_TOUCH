@@ -112,6 +112,10 @@ void set_play_source(int i){
     }
     atomic_store(&music_source, i);
 }
+void stop_music(void) {
+    audio_pipeline_pause(pipeline_embeded);
+    audio_pipeline_pause(pipeline);
+}
 int get_play_source(void){
     int current_status = atomic_load(&music_source);
     return current_status;
