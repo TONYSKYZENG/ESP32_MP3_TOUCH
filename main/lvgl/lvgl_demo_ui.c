@@ -17,7 +17,9 @@
 #include "esp_timer.h"
 #include "i2c_bus.h"
 #include "aht10.h"
-static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text,*hour_roller,*minute_roller,*btn_time_set,*label_time_set,*label_aht;
+static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text,*hour_roller,*minute_roller,*btn_time_set,*label_time_set,*label_aht,*btn_game;
+lv_obj_t *window_home;
+extern void ballgame_start(lv_obj_t *scr);
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_270;
 extern int player_volume;
 extern void set_player_vol(int vol);
@@ -93,6 +95,12 @@ static void btn_loop_cb(lv_event_t * e)
         lv_label_set_text_static(btn_loop_text, LV_SYMBOL_LOOP" ");
     }
 }
+
+static void btn_game_cb(lv_event_t * e)
+{
+   stop_music();
+   ballgame_start(window_home);
+}
 static void btn_source_cb(lv_event_t * e)
 {
     int curr_status = get_play_source();
@@ -167,17 +175,16 @@ static void set_angle(void * obj, int32_t v)
 
 void example_lvgl_demo_ui(lv_display_t *disp)
 {
-    lv_obj_t *scr = lv_display_get_screen_active(disp);
+    window_home = lv_display_get_screen_active(disp);
     lv_disp_set_rotation(disp, LV_DISP_ROTATION_270);
    
-
     /*Button event*/
    
     {
             // btn_go
-            lv_obj_t *obj = lv_button_create(scr);
+            lv_obj_t *obj = lv_button_create(window_home);
             btn = obj;
-            lv_obj_set_pos(obj, 19, 180);
+            lv_obj_set_pos(obj, 0, 180);
             lv_obj_set_size(obj, 71, 26);
             {
                 lv_obj_t *parent_obj = obj;
@@ -193,9 +200,9 @@ void example_lvgl_demo_ui(lv_display_t *disp)
         }
     {
             // btn_loop
-            lv_obj_t *obj = lv_button_create(scr);
+            lv_obj_t *obj = lv_button_create(window_home);
             btn_loop = obj;
-            lv_obj_set_pos(obj, 105, 180);
+            lv_obj_set_pos(obj, 80, 180);
             lv_obj_set_size(obj, 71, 26);
             {
                 lv_obj_t *parent_obj = obj;
@@ -213,7 +220,7 @@ void example_lvgl_demo_ui(lv_display_t *disp)
     /*vol slider*/
      {
             // slider_vol
-            lv_obj_t *obj = lv_slider_create(scr);
+            lv_obj_t *obj = lv_slider_create(window_home);
             slider_vol = obj;
             lv_obj_set_pos(obj, 20, 14);
             lv_obj_set_size(obj, 120, 16);
@@ -222,7 +229,7 @@ void example_lvgl_demo_ui(lv_display_t *disp)
      }
    {
             // music_roller
-            lv_obj_t *obj = lv_roller_create(scr);
+            lv_obj_t *obj = lv_roller_create(window_home);
             music_roller = obj;
             lv_obj_set_pos(obj, 0, 54);
             lv_obj_set_size(obj, 150, 100);
@@ -234,16 +241,16 @@ void example_lvgl_demo_ui(lv_display_t *disp)
     }
     gen_number_idx(hour_string_buf,12);
     gen_number_idx(minute_string_buf,60);
-    hour_roller = lv_roller_create(scr);
+    hour_roller = lv_roller_create(window_home);
     // 用 \n 把数字一行行传进去
     lv_roller_set_options(hour_roller, 
        hour_string_buf, 
         LV_ROLLER_MODE_NORMAL);
     lv_obj_set_pos(hour_roller, 160, 54);
     lv_obj_set_size(hour_roller, 50, 80);
-    minute_roller = lv_roller_create(scr);
+    minute_roller = lv_roller_create(window_home);
     // 用 \n 把数字一行行传进去
-     lv_obj_t *lable_h = lv_label_create(scr);
+     lv_obj_t *lable_h = lv_label_create(window_home);
         lv_obj_set_pos(lable_h, 160, 32);
         lv_obj_set_size(lable_h, 50, 16);
         lv_label_set_text_static(lable_h, "hour");
@@ -255,25 +262,25 @@ void example_lvgl_demo_ui(lv_display_t *disp)
     lv_obj_set_size(minute_roller, 50, 80);
     lv_roller_set_visible_row_count(hour_roller, 2); // 设置可见行数
     lv_roller_set_visible_row_count(minute_roller, 2);
-    lv_obj_t *lable_m = lv_label_create(scr);
+    lv_obj_t *lable_m = lv_label_create(window_home);
     lv_obj_set_pos(lable_m, 220, 32);
     lv_obj_set_size(lable_m, 50, 16);
     lv_label_set_text_static(lable_m, "min");
 
-    label_time_set  = lv_label_create(scr);
+    label_time_set  = lv_label_create(window_home);
     lv_obj_set_pos(label_time_set, 0, 220);
     lv_obj_set_size(label_time_set, 100, 16);
     lv_label_set_text_static(label_time_set, "0:0");
 
-    label_aht  = lv_label_create(scr);
+    label_aht  = lv_label_create(window_home);
     lv_obj_set_pos(label_aht, 160, 0);
     lv_obj_set_size(label_aht, 120, 16);
     lv_label_set_text_static(label_aht, "0");
     {
             // btn_source
-            lv_obj_t *obj = lv_button_create(scr);
+            lv_obj_t *obj = lv_button_create(window_home);
             btn_source = obj;
-            lv_obj_set_pos(obj, 180, 180);
+            lv_obj_set_pos(obj, 160, 180);
             lv_obj_set_size(obj, 71, 26);
             {
                 lv_obj_t *parent_obj = obj;
@@ -289,8 +296,27 @@ void example_lvgl_demo_ui(lv_display_t *disp)
             lv_obj_add_event_cb(btn_source, btn_source_cb, LV_EVENT_CLICKED, disp);
     }
      {
+            // btn_source
+            lv_obj_t *obj = lv_button_create(window_home);
+            btn_game = obj;
+            lv_obj_set_pos(obj, 240, 180);
+            lv_obj_set_size(obj, 71, 26);
+            {
+                lv_obj_t *parent_obj = obj;
+                {
+                    lv_obj_t *obj = lv_label_create(parent_obj);
+                    lv_obj_set_pos(obj, 1, 0);
+                    lv_obj_set_size(obj, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+                    lv_obj_set_style_align(obj, LV_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+                    lv_label_set_text_static(obj, "Game");
+                }
+            }
+            lv_obj_add_event_cb(btn_game, btn_game_cb, LV_EVENT_CLICKED, disp);
+    }
+
+     {
             // btn_time_set_cb
-            lv_obj_t *obj = lv_button_create(scr);
+            lv_obj_t *obj = lv_button_create(window_home);
             btn_time_set = obj;
             lv_obj_set_pos(obj, 180, 130);
             lv_obj_set_size(obj, 71, 26);

@@ -81,7 +81,7 @@ static const char *TAG = "example";
 static _lock_t lvgl_api_lock;
 
 extern void example_lvgl_demo_ui(lv_disp_t *disp);
-
+lv_indev_t *g_lvgl_input_dev;
 static bool example_notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx)
 {
     lv_display_t *disp = (lv_display_t *)user_ctx;
@@ -292,12 +292,12 @@ void app_main_lvgl_drv(void)
     ESP_ERROR_CHECK(esp_lcd_touch_new_spi_xpt2046(tp_io_handle, &tp_cfg, &tp));
 #endif
 
-    static lv_indev_t *indev;
-    indev = lv_indev_create(); // Input device driver (Touch)
-    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
-    lv_indev_set_display(indev, display);
-    lv_indev_set_user_data(indev, tp);
-    lv_indev_set_read_cb(indev, example_lvgl_touch_cb);
+   
+    g_lvgl_input_dev = lv_indev_create(); // Input device driver (Touch)
+    lv_indev_set_type(g_lvgl_input_dev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_display(g_lvgl_input_dev, display);
+    lv_indev_set_user_data(g_lvgl_input_dev, tp);
+    lv_indev_set_read_cb(g_lvgl_input_dev, example_lvgl_touch_cb);
 #endif
 
     ESP_LOGI(TAG, "Create LVGL task");
