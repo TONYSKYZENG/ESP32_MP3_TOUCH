@@ -15,7 +15,9 @@
 #include <stdatomic.h>
 #include "play_embeded.h"
 #include "esp_timer.h"
-static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text,*hour_roller,*minute_roller,*btn_time_set,*label_time_set;
+#include "i2c_bus.h"
+#include "aht10.h"
+static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text,*hour_roller,*minute_roller,*btn_time_set,*label_time_set,*label_aht;
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_270;
 extern int player_volume;
 extern void set_player_vol(int vol);
@@ -24,14 +26,16 @@ static _lock_t lvgl_window_lock;
 static char * song_string_buf = NULL;
 char hour_string_buf[512];
 char minute_string_buf[1024];
-char label_time_buf[1024];
+char label_time_buf[512];
+char label_aht_buf[512];
 extern char * song_string_emb;
 extern void play_music_index(int idx);
 atomic_int g_is_loop_play = 0;
 
 atomic_int g_timer_max = 99999;
 atomic_int g_timer_cur = 0;
- esp_timer_handle_t periodic_timer;
+esp_timer_handle_t music_timer,aht10_timer;
+aht10_dev_t aht_sensor;
 int get_loop_play(void) {
     int current_status = atomic_load(&g_is_loop_play);
     return current_status;
@@ -58,12 +62,12 @@ int get_timer_cur(void) {
 static void btn_cb(lv_event_t * e)
 {
     int selected_index = lv_roller_get_selected(music_roller);
-    esp_timer_stop(periodic_timer);
+    esp_timer_stop(music_timer);
     play_music_index(selected_index);
     set_timer_cur(0);
     update_time_show();
     uint64_t period_us = 60 * 1000 * 1000; 
-   ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, period_us));
+   ESP_ERROR_CHECK(esp_timer_start_periodic(music_timer, period_us));
 }
 void gen_number_idx (char *buf,int idx){
      if (buf == NULL) return;
@@ -110,7 +114,7 @@ void update_time_show(void) {
      _lock_release(&lvgl_window_lock);
 }
 static void btn_time_set_cb(lv_event_t * e)
-{   esp_timer_stop(periodic_timer);
+{   esp_timer_stop(music_timer);
     int hour_index = lv_roller_get_selected(hour_roller);
     int min_index = lv_roller_get_selected(minute_roller);
    int val_set = hour_index*60+min_index;
@@ -118,10 +122,10 @@ static void btn_time_set_cb(lv_event_t * e)
    set_timer_max(val_set);
    update_time_show();
    uint64_t period_us = 60 * 1000 * 1000; 
-   ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, period_us));
+   ESP_ERROR_CHECK(esp_timer_start_periodic(music_timer, period_us));
    //update_time_show();
 }
-static void periodic_timer_callback(void* arg)
+static void music_timer_callback(void* arg)
 {
    int val = get_timer_cur();
    int max = get_timer_max();
@@ -133,6 +137,18 @@ static void periodic_timer_callback(void* arg)
             stop_music();
         }
    }
+   // printf("time out: %lld ms", time_since_boot);
+}
+
+static void aht_timer_callback(void* arg)
+{
+    if (aht10_read_measurements(&aht_sensor) == ESP_OK) {
+        sprintf(label_aht_buf, "T:%.1f C,H:%.1f %%", aht_sensor.temperature,aht_sensor.humidity);
+        _lock_acquire(&lvgl_window_lock);
+        lv_label_set_text_static(label_aht,label_aht_buf);
+        _lock_release(&lvgl_window_lock);
+        ESP_LOGI("AHT", "Temp: %.1f, Hum: %.1f", aht_sensor.temperature, aht_sensor.humidity);
+    }
    // printf("time out: %lld ms", time_since_boot);
 }
 void action_on_vol_value_changed(lv_event_t * e){
@@ -243,10 +259,16 @@ void example_lvgl_demo_ui(lv_display_t *disp)
     lv_obj_set_pos(lable_m, 220, 32);
     lv_obj_set_size(lable_m, 50, 16);
     lv_label_set_text_static(lable_m, "min");
+
     label_time_set  = lv_label_create(scr);
     lv_obj_set_pos(label_time_set, 0, 220);
     lv_obj_set_size(label_time_set, 100, 16);
     lv_label_set_text_static(label_time_set, "0:0");
+
+    label_aht  = lv_label_create(scr);
+    lv_obj_set_pos(label_aht, 160, 0);
+    lv_obj_set_size(label_aht, 120, 16);
+    lv_label_set_text_static(label_aht, "0");
     {
             // btn_source
             lv_obj_t *obj = lv_button_create(scr);
@@ -285,23 +307,31 @@ void example_lvgl_demo_ui(lv_display_t *disp)
             lv_obj_add_event_cb(btn_time_set, btn_time_set_cb, LV_EVENT_CLICKED, disp);
     }
 
-    const esp_timer_create_args_t periodic_timer_args = {
-        .callback = &periodic_timer_callback, // 绑定回调函数
-        .name = "periodic_1s_timer",          // 定时器名称（用于调试）
-        /* 
-           skip_unhandled_events = true (可选): 
-           如果定时器由于某些原因产生阻塞，跳过错过的触发，防止多次回调堆积。
-        */
+    { //music timer
+    const esp_timer_create_args_t music_timer_args = {
+        .callback = &music_timer_callback, // 绑定回调函数
+        .name = "music",          // 定时器名称（用于调试）
         .skip_unhandled_events = true,        
     };
-
-    // 3. 创建定时器句柄
-   
-    ESP_ERROR_CHECK(esp_timer_create(&periodic_timer_args, &periodic_timer));
-
-    // 4. 启动定时器（周期性模式）
+    ESP_ERROR_CHECK(esp_timer_create(&music_timer_args, &music_timer));
     uint64_t period_us = 60 * 1000 * 1000; 
-    ESP_ERROR_CHECK(esp_timer_start_periodic(periodic_timer, period_us));
+    ESP_ERROR_CHECK(esp_timer_start_periodic(music_timer, period_us));
+    }
+    
+    { 
+        //aht10 timer
+        i2c_master_bus_handle_t bus_handle = i2c_bus_get_master_handle(I2C_NUM_0);
+        ESP_ERROR_CHECK(aht10_init(bus_handle, &aht_sensor));
+        const esp_timer_create_args_t aht_timer_args = {
+        .callback = &aht_timer_callback, // 绑定回调函数
+        .name = "aht",          // 定时器名称（用于调试）
+        .skip_unhandled_events = true,        
+        };
+        ESP_ERROR_CHECK(esp_timer_create(&aht_timer_args, &aht10_timer));
+        uint64_t period_us = 1 * 1000 * 1000; 
+        ESP_ERROR_CHECK(esp_timer_start_periodic(aht10_timer, period_us));
+    }
+
 }
 void sync_vol(int player_volume){
      _lock_acquire(&lvgl_window_lock);
