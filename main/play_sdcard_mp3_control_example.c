@@ -34,6 +34,8 @@
 #include "sdcard_scan.h"
 #include <stdatomic.h>
 #include "play_embeded.h"
+#include "nvs_flash.h"
+#include "play_bt.h"
 static const char *TAG = "SDCARD_MP3_CONTROL_EXAMPLE";
 
 audio_pipeline_handle_t pipeline,pipeline_embeded;
@@ -44,7 +46,11 @@ extern void app_main_lvgl_drv(void);
 extern void sync_vol(int vol);
 extern int get_loop_play(void);
 atomic_int force_music_idx = 0;
+extern audio_element_handle_t bt_stream_reader;
+extern audio_pipeline_handle_t pipeline_bt;
+extern audio_event_iface_handle_t evt_bt;
 
+extern void bt_app_avrc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *p_param);
 void set_player_vol(int vol){
     if (vol > 100) {
             vol = 100;
@@ -179,16 +185,35 @@ void sdcard_url_save_cb(void *user_data, char *url)
 
 void app_main(void)
 {
+
+    esp_err_t err = nvs_flash_init();
+    if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
+        // NVS partition was truncated and needs to be erased
+        // Retry nvs_flash_init
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        err = nvs_flash_init();
+    }
     esp_log_level_set("*", ESP_LOG_WARN);
     esp_log_level_set(TAG, ESP_LOG_INFO);
     int player_volume;
     ESP_LOGI(TAG, "[1.0] Initialize peripherals management");
     esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
     esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+   
+    esp_periph_handle_t bt_periph = bluetooth_service_create_periph();
 
+    ESP_LOGI(TAG, "[ 1.0 ] Create Bluetooth service");
+    bluetooth_service_cfg_t bt_cfg = {
+        .device_name = "ESP-ADF-SPEAKER",
+        .mode = BLUETOOTH_A2DP_SINK,
+        .user_callback.user_avrc_ct_cb = bt_app_avrc_ct_cb,
+    };
+    bluetooth_service_start(&bt_cfg);
+    
     ESP_LOGI(TAG, "[1.1] Initialize and start peripherals");
     audio_board_key_init(set);
     audio_board_sdcard_init(set, SD_MODE_1_LINE);
+    esp_periph_start(set, bt_periph);
 
     ESP_LOGI(TAG, "[1.2] Set up a sdcard playlist and scan sdcard music save to it");
     sdcard_list_create(&sdcard_list_handle);
@@ -271,8 +296,31 @@ void app_main(void)
            to set music info and to advance to the next song
         */
         //play_music_index_isr();
+         audio_event_iface_msg_t msg_bt;
+        esp_err_t ret = audio_event_iface_listen(evt_bt, &msg_bt, portMAX_DELAY);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+            continue;
+        }
+
+        if (msg_bt.source_type == AUDIO_ELEMENT_TYPE_ELEMENT && msg_bt.source == (void *) bt_stream_reader
+            && msg_bt.cmd == AEL_MSG_CMD_REPORT_MUSIC_INFO) {
+            audio_element_info_t music_info = {0};
+            audio_element_getinfo(bt_stream_reader, &music_info);
+
+            ESP_LOGI(TAG, "[ * ] Receive music info from Bluetooth, sample_rates=%d, bits=%d, ch=%d",
+                     music_info.sample_rates, music_info.bits, music_info.channels);
+
+            audio_element_set_music_info(i2s_stream_writer, music_info.sample_rates, music_info.channels, music_info.bits);
+#if (CONFIG_ESP_LYRATD_MSC_V2_1_BOARD || CONFIG_ESP_LYRATD_MSC_V2_2_BOARD)
+#else
+            i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
+#endif
+            //continue;
+        }
+
         audio_event_iface_msg_t msg;
-        esp_err_t ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
+         ret = audio_event_iface_listen(evt, &msg, portMAX_DELAY);
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
             continue;

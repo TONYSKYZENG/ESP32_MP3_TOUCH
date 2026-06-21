@@ -19,7 +19,6 @@
 #include "aht10.h"
 static lv_obj_t * btn,*slider_vol,*music_roller,*btn_loop,*btn_loop_text,*btn_source,*btn_source_text,*hour_roller,*minute_roller,*btn_time_set,*label_time_set,*label_aht,*btn_game;
 lv_obj_t *window_home;
-extern void ballgame_start(lv_obj_t *scr);
 static lv_display_rotation_t rotation = LV_DISP_ROTATION_270;
 extern int player_volume;
 extern void set_player_vol(int vol);
@@ -99,7 +98,7 @@ static void btn_loop_cb(lv_event_t * e)
 static void btn_game_cb(lv_event_t * e)
 {
    stop_music();
-   ballgame_start(window_home);
+   //ballgame_start(window_home);
 }
 static void btn_source_cb(lv_event_t * e)
 {
