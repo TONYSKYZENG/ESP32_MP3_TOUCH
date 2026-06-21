@@ -108,6 +108,10 @@ static void btn_source_cb(lv_event_t * e)
         set_play_source(1);
         play_embeded_loop(mp3_data_start_train,mp3_data_end_train);
     }
+    else if (curr_status==1) {
+         lv_label_set_text_static(btn_source_text, "BT");
+        set_play_source(2);
+    }
     else {
          lv_label_set_text_static(btn_source_text, "SD");
         set_play_source(0);

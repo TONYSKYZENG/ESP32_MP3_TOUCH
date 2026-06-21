@@ -64,5 +64,5 @@ To exit the serial monitor, type ``Ctrl-]``.
 
 See [ESP-IDF Programming Guide](https://docs.espressif.com/projects/esp-idf/en/release-v5.3/esp32/index.html) for full steps to configure and build an ESP-IDF project.
 
-### Game information
-The game is ported from [LVGL Game on ESP32](https://github.com/Horion0415/LVGL_Game_on_ESP32/).
+### Extra Bluetooth 
+Press the third button, untill it says BT, then connect and play

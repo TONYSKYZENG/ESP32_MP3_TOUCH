@@ -46,9 +46,10 @@ extern void app_main_lvgl_drv(void);
 extern void sync_vol(int vol);
 extern int get_loop_play(void);
 atomic_int force_music_idx = 0;
-extern audio_element_handle_t bt_stream_reader;
+extern audio_element_handle_t bt_stream_reader,i2s_stream_writer_3;
 extern audio_pipeline_handle_t pipeline_bt;
 extern audio_event_iface_handle_t evt_bt;
+
 
 extern void bt_app_avrc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *p_param);
 void set_player_vol(int vol){
@@ -197,24 +198,24 @@ void app_main(void)
     esp_log_level_set(TAG, ESP_LOG_INFO);
     int player_volume;
     ESP_LOGI(TAG, "[1.0] Initialize peripherals management");
-    esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
-    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
-   
-    esp_periph_handle_t bt_periph = bluetooth_service_create_periph();
-
-    ESP_LOGI(TAG, "[ 1.0 ] Create Bluetooth service");
     bluetooth_service_cfg_t bt_cfg = {
         .device_name = "ESP-ADF-SPEAKER",
         .mode = BLUETOOTH_A2DP_SINK,
         .user_callback.user_avrc_ct_cb = bt_app_avrc_ct_cb,
     };
     bluetooth_service_start(&bt_cfg);
+    esp_periph_config_t periph_cfg = DEFAULT_ESP_PERIPH_SET_CONFIG();
+    esp_periph_set_handle_t set = esp_periph_set_init(&periph_cfg);
+   
+    esp_periph_handle_t bt_periph = bluetooth_service_create_periph();
+
+   
     
     ESP_LOGI(TAG, "[1.1] Initialize and start peripherals");
     audio_board_key_init(set);
     audio_board_sdcard_init(set, SD_MODE_1_LINE);
     esp_periph_start(set, bt_periph);
-
+    init_sound_bt();
     ESP_LOGI(TAG, "[1.2] Set up a sdcard playlist and scan sdcard music save to it");
     sdcard_list_create(&sdcard_list_handle);
     sdcard_scan(sdcard_url_save_cb, "/sdcard", 0, (const char *[]) {"mp3"}, 1, sdcard_list_handle);
@@ -299,7 +300,7 @@ void app_main(void)
          audio_event_iface_msg_t msg_bt;
         esp_err_t ret = audio_event_iface_listen(evt_bt, &msg_bt, portMAX_DELAY);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
+            //ESP_LOGE(TAG, "[ * ] Event interface error : %d", ret);
             continue;
         }
 
@@ -310,12 +311,9 @@ void app_main(void)
 
             ESP_LOGI(TAG, "[ * ] Receive music info from Bluetooth, sample_rates=%d, bits=%d, ch=%d",
                      music_info.sample_rates, music_info.bits, music_info.channels);
-
-            audio_element_set_music_info(i2s_stream_writer, music_info.sample_rates, music_info.channels, music_info.bits);
-#if (CONFIG_ESP_LYRATD_MSC_V2_1_BOARD || CONFIG_ESP_LYRATD_MSC_V2_2_BOARD)
-#else
-            i2s_stream_set_clk(i2s_stream_writer, music_info.sample_rates, music_info.bits, music_info.channels);
-#endif
+                
+            audio_element_set_music_info(i2s_stream_writer_3, music_info.sample_rates, music_info.channels, music_info.bits);
+            i2s_stream_set_clk(i2s_stream_writer_3, music_info.sample_rates, music_info.bits, music_info.channels);
             //continue;
         }
 

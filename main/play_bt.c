@@ -16,7 +16,7 @@
 #include "filter_resample.h"
 #include "audio_mem.h"
 #include "bluetooth_service.h"
-audio_element_handle_t bt_stream_reader;
+audio_element_handle_t bt_stream_reader,i2s_stream_writer_3;
 audio_pipeline_handle_t pipeline_bt;
 audio_event_iface_handle_t evt_bt;
 
@@ -40,11 +40,6 @@ void bt_app_avrc_ct_cb(esp_avrc_ct_cb_event_t event, esp_avrc_ct_cb_param_t *p_p
 
 void init_sound_bt(void)
 {
-   
-    audio_element_handle_t i2s_stream_writer;
-
-   
-
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set(TAG, ESP_LOG_DEBUG);
 
@@ -56,16 +51,16 @@ void init_sound_bt(void)
     ESP_LOGI(TAG, "[3.1] Create i2s stream to write data to codec chip");
     i2s_stream_cfg_t i2s_cfg = I2S_STREAM_CFG_DEFAULT();
     i2s_cfg.type = AUDIO_STREAM_WRITER;
-    i2s_stream_writer = i2s_stream_init(&i2s_cfg);
+    i2s_stream_writer_3 = i2s_stream_init(&i2s_cfg);
 
     ESP_LOGI(TAG, "[3.2] Get Bluetooth stream");
     bt_stream_reader = bluetooth_service_create_stream();
 
     ESP_LOGI(TAG, "[3.2] Register all elements to audio pipeline");
     audio_pipeline_register(pipeline_bt, bt_stream_reader, "bt");
-    audio_pipeline_register(pipeline_bt,i2s_stream_writer, "i2s3");
+    audio_pipeline_register(pipeline_bt,i2s_stream_writer_3, "i2s3");
 
-    ESP_LOGI(TAG, "[3.3] Link it together [Bluetooth]-->bt_stream_reader-->i2s_stream_writer-->[codec_chip]");
+    ESP_LOGI(TAG, "[3.3] Link it together [Bluetooth]-->bt_stream_reader-->i2s_stream_writer_3-->[codec_chip]");
 
 #if (CONFIG_ESP_LYRATD_MSC_V2_1_BOARD || CONFIG_ESP_LYRATD_MSC_V2_2_BOARD)
     rsp_filter_cfg_t rsp_cfg = DEFAULT_RESAMPLE_FILTER_CONFIG();
@@ -75,7 +70,7 @@ void init_sound_bt(void)
     rsp_cfg.dest_ch = 2;
     audio_element_handle_t filter = rsp_filter_init(&rsp_cfg);
     audio_pipeline_register(pipeline_bt, filter, "filter");
-    i2s_stream_set_clk(i2s_stream_writer, 48000, 16, 2);
+    i2s_stream_set_clk(i2s_stream_writer_3, 48000, 16, 2);
     const char *link_tag[3] = {"bt", "filter", "i2s"};
     audio_pipeline_link(pipeline_bt, &link_tag[0], 3);
 #else
@@ -92,4 +87,7 @@ void init_sound_bt(void)
 
     ESP_LOGI(TAG, "[5.1] Listening event from all elements of pipeline");
     audio_pipeline_set_listener(pipeline_bt, evt_bt);
+
+    audio_pipeline_run(pipeline_bt);
+    audio_pipeline_pause(pipeline_bt);
 }

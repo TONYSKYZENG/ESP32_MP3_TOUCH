@@ -23,9 +23,9 @@
 #include <stdatomic.h>
 static const char *TAG = "PLAY_MP3_EMB";
 extern audio_board_handle_t g_board_handle;
-extern audio_pipeline_handle_t pipeline,pipeline_embeded;
+extern audio_pipeline_handle_t pipeline,pipeline_embeded,pipeline_bt;
 audio_element_handle_t i2s_stream_writer_2,mp3_decoder_2;
-extern audio_element_handle_t i2s_stream_writer;
+extern audio_element_handle_t i2s_stream_writer,i2s_stream_writer_3,mp3_decoder,bt_stream_reader;
 atomic_int music_source = 0;
 extern atomic_int force_music_idx;
 static struct marker {
@@ -101,20 +101,32 @@ void set_play_source(int i){
     if (i==0) {
         update_song_list_sd(sdcard_list_handle);
         audio_pipeline_pause(pipeline_embeded);
+        audio_pipeline_pause(pipeline_bt);
         i2s_stream_set_clk(i2s_stream_writer, 48000, 16, 2);
         audio_pipeline_resume(pipeline);
+
+        
     }
-    else{
+    else if (i==1) {
         audio_pipeline_pause(pipeline);
+        audio_pipeline_pause(pipeline_bt);
         update_song_list_emb();
         i2s_stream_set_clk(i2s_stream_writer_2, 32000, 16, 1);
         audio_pipeline_resume(pipeline_embeded);
     }
+    else {
+        audio_pipeline_pause(pipeline);
+        audio_pipeline_pause(pipeline_embeded);
+       // i2s_stream_set_clk(i2s_stream_writer_3, 48000, 16, 1);
+        audio_pipeline_resume(pipeline_bt);
+    }
+
     atomic_store(&music_source, i);
 }
 void stop_music(void) {
     audio_pipeline_pause(pipeline_embeded);
     audio_pipeline_pause(pipeline);
+    audio_pipeline_pause(pipeline_bt);
 }
 int get_play_source(void){
     int current_status = atomic_load(&music_source);
